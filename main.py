@@ -4,6 +4,7 @@ import time
 import pywhatkit
 import sqlite3
 from datetime import datetime
+from tkinter import *
 
 # Load NLP model
 nlp = spacy.load("en_core_web_sm")
@@ -38,16 +39,16 @@ def get_tasks():
 def parse_task(task_string):
     doc = nlp(task_string)
     task = []
-    time = None
-    date = None
+    task_time = None
+    task_date = None
     for token in doc:
         if token.ent_type_ == "TIME":
-            time = token.text
+            task_time = token.text
         elif token.ent_type_ == "DATE":
-            date = token.text
+            task_date = token.text
         else:
             task.append(token.text)
-    return " ".join(task), date, time
+    return " ".join(task), task_date, task_time
 
 # Schedule task for reminder
 def schedule_task(task, task_date, task_time):
@@ -58,17 +59,53 @@ def schedule_task(task, task_date, task_time):
 def send_reminder(task):
     pywhatkit.sendwhatmsg_instantly("+911234567890", f"Reminder: {task}", 15, True, 2)
 
+# Add task from GUI
+def add_task_from_gui():
+    user_input = task_entry.get()
+    task, task_date, task_time = parse_task(user_input)
+    if task and task_date and task_time:
+        add_task(task, task_date, task_time)
+        schedule_task(task, task_date, task_time)
+        task_entry.delete(0, END)
+        display_tasks()
+
+# Display tasks in the GUI
+def display_tasks():
+    tasks = get_tasks()
+    task_listbox.delete(0, END)  # Clear the listbox before updating
+    for task in tasks:
+        task_listbox.insert(END, f"Task: {task[1]}, Date: {task[3]}, Time: {task[2]}")
+
+# Main GUI setup
+def create_gui():
+    global task_entry, task_listbox
+
+    root = Tk()
+    root.title("Task Manager with NLP")
+    
+    # Task input area
+    Label(root, text="Enter Task:").grid(row=0, column=0)
+    task_entry = Entry(root, width=50)
+    task_entry.grid(row=0, column=1)
+    
+    add_task_btn = Button(root, text="Add Task", command=add_task_from_gui)
+    add_task_btn.grid(row=0, column=2)
+
+    # Task list display
+    task_listbox = Listbox(root, width=80, height=15)
+    task_listbox.grid(row=1, column=0, columnspan=3)
+
+    # Run display
+    display_tasks()
+
+    root.mainloop()
+
 # Main loop
 def main():
     init_db()
-    while True:
-        user_input = input("Enter your task: ")
-        task, task_date, task_time = parse_task(user_input)
-        add_task(task, task_date, task_time)
-        schedule_task(task, task_date, task_time)
-        print(f"Task '{task}' scheduled on {task_date} at {task_time}")
+    create_gui()
 
-        # Check if it's time to execute any task
+    while True:
         schedule.run_pending()
         time.sleep(1)
 
